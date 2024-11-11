@@ -132,13 +132,9 @@ int main(int argc, char *argv[])
                 std::cerr << "Error: Could not open directory " << searchpath << std::endl;
                 exit(EXIT_FAILURE);
             }
-
-            if (is_recursive){
-                file_found = directory_find_recursive(dirp, filename);
-            } else {
-                file_found = directory_find(dirp, filename);
-            }
-
+        
+            file_found = directory_find(searchpath, filename, is_recursive, is_case_insensitive);
+            
             closedir(dirp);
 
             if (!file_found) {
