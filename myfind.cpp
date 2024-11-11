@@ -90,14 +90,6 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    std::string filename = argv[optind++];
-    if (filename.length() == 0)
-    {
-        std::cerr << "Error: filename is missing.\n";
-        print_usage(program_name);
-        return EXIT_FAILURE;
-    }
-
     // TODO: Implement the search logic here
 
     bool directory_open_fail = dirp == NULL;
@@ -105,17 +97,6 @@ int main(int argc, char *argv[])
     {
         perror("failed to open directory");
         return 1;
-    }
-
-    // std::cout << "DEBUG opened directory" << std::endl
-    //           << "reading contents of opened directory:" << std::endl
-    //           << std::endl;
-
-    file_found = directory_find(searchpath, filename, is_recursive, is_case_insensitive);
-
-    if (!file_found)
-    {
-        std::cout << "DEBUG file does not exist in given directory" << std::endl;
     }
       
     // TODO: Child process for each filepath 
