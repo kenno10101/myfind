@@ -3,6 +3,9 @@
 #include <string>
 #include <unistd.h> // für getopt()
 #include <dirent.h> // für directory operations
+#include <vector>
+#include <string>
+#include <sys/wait.h> // for waitpid
 
 namespace fs = std::filesystem;
 
@@ -114,8 +117,59 @@ int main(int argc, char *argv[])
     {
         std::cout << "DEBUG file does not exist in given directory" << std::endl;
     }
+      
+    // TODO: Child process for each filepath 
 
-    // TODO: Child process for each filepath
+    std::vector<pid_t> children;
+
+    for (int i = optind; i < argc; i++) {
+        std::string filename = argv[i];
+        pid_t pid = fork();
+        if (pid == 0) {
+            // Child process
+            DIR *dirp = opendir(searchpath.c_str()); // convert fs::path to const char * and open directory
+            if (dirp == NULL) {
+                std::cerr << "Error: Could not open directory " << searchpath << std::endl;
+                exit(EXIT_FAILURE);
+            }
+
+            if (is_recursive){
+                file_found = directory_find_recursive(dirp, filename);
+            } else {
+                file_found = directory_find(dirp, filename);
+            }
+
+            closedir(dirp);
+
+            if (!file_found) {
+                std::cout << "File " << filename << " not found in " << searchpath << std::endl;
+            }
+
+            exit(EXIT_SUCCESS);
+        } 
+        
+        else if (pid > 0) {
+            // Parent process
+            children.push_back(pid);
+        } 
+        
+        else {
+            // Error
+            std::cerr << "Error: Could not create child process\n";
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // Wait for all child processes to finish
+    for (pid_t pid : children) {
+        int status;
+        pid_t wpid = waitpid(pid, &status, 0);
+
+        if(wpid == -1) {
+            std::cerr << "Error: waitpid failed\n";
+            exit(EXIT_FAILURE);
+        }
+    }
 
     return EXIT_SUCCESS;
 }
