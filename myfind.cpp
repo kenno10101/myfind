@@ -6,22 +6,39 @@
 
 namespace fs = std::filesystem;
 
-void print_usage(const std::string &program_name) {
+void print_usage(const std::string &program_name)
+{
     std::cerr << "Usage: " << program_name << " [-R] [-i] searchpath filename1 [filename2] ... [filenameN]\n";
     exit(EXIT_FAILURE);
 }
 
-bool directory_find(DIR *dirp, std::string filename){
+bool directory_find(fs::path &path, std::string &filename, bool is_recursive, bool is_case_insensitive)
+{
+    if (is_case_insensitive)
+    {
+        filename = filename;
+    }
 
-    struct dirent *direntp;
-    while ((direntp = readdir(dirp)) != NULL){
-        std::string current_file = direntp->d_name;
-        if (current_file[0] == '.'){
-            continue;
+    if (is_recursive)
+    {
+        for (auto const &dir_entry : fs::recursive_directory_iterator{path})
+        {
+            if (filename == dir_entry.path().filename())
+            {
+                std::cout << getpid() << ": " << filename << ": " << dir_entry.path() << "\n";
+                return true;
+            }
         }
-        std::cout << current_file << std::endl;
-        if (filename == current_file){
-            return true;
+    }
+    else
+    {
+        for (auto const &dir_entry : fs::directory_iterator{path})
+        {
+            if (filename == dir_entry.path().filename())
+            {
+                std::cout << getpid() << ": " << filename << ": " << dir_entry.path() << "\n";
+                return true;
+            }
         }
     }
 
@@ -29,27 +46,8 @@ bool directory_find(DIR *dirp, std::string filename){
     
 }
 
-bool directory_find_recursive(DIR *dirp, std::string &filename){
-//TODO implement recursive search / search sub-directories
-    struct dirent *direntp;
-    while ((direntp = readdir(dirp)) != NULL){
-        std::string current_file = direntp->d_name;
-        if (current_file[0] == '.'){
-            continue;
-        }
-
-        if(current_file.rfind(".", 0))
-        std::cout << current_file << std::endl;
-        if (filename == current_file){
-            return true;
-        }
-    }
-
-    return false;
-
-}
-
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     bool is_recursive = false;
     bool is_case_insensitive = false;
     int c;
@@ -57,20 +55,25 @@ int main(int argc, char *argv[]) {
     std::string program_name = argv[0];
     bool file_found = false;
 
-    while ((c = getopt(argc, argv, "Ri")) != EOF) {
-        switch (c) {
-            case 'R': is_recursive = true; 
+    while ((c = getopt(argc, argv, "Ri")) != EOF)
+    {
+        switch (c)
+        {
+        case 'R':
+            is_recursive = true;
             break;
-            case 'i': is_case_insensitive = true; 
+        case 'i':
+            is_case_insensitive = true;
             break;
-            case '?':
-                error = true;
-            default:
-                error = true;
+        case '?':
+            error = true;
+        default:
+            error = true;
         }
     }
 
-    if(error || optind >= argc) {
+    if (error || optind >= argc)
+    {
         print_usage(program_name);
     }
 
@@ -78,18 +81,19 @@ int main(int argc, char *argv[]) {
     dirp = opendir(argv[optind]);
 
     fs::path searchpath = argv[optind++];
-    if (!fs::exists(searchpath) || !fs::is_directory(searchpath)) {
+    if (!fs::exists(searchpath) || !fs::is_directory(searchpath))
+    {
         std::cerr << "Error: " << searchpath << " is not a valid directory.\n";
         return EXIT_FAILURE;
     }
 
     std::string filename = argv[optind++];
-    if (filename.length() == 0) {
+    if (filename.length() == 0)
+    {
         std::cerr << "Error: filename is missing.\n";
         print_usage(program_name);
         return EXIT_FAILURE;
     }
-
 
     // TODO: Implement the search logic here
 
@@ -100,27 +104,18 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    std::cout << "DEBUG opened directory" << std::endl << "reading contents of opened directory:" << std::endl << std::endl;
+    // std::cout << "DEBUG opened directory" << std::endl
+    //           << "reading contents of opened directory:" << std::endl
+    //           << std::endl;
 
-    if(is_case_insensitive){
+    file_found = directory_find(searchpath, filename, is_recursive, is_case_insensitive);
 
-    }
-
-
-    if (is_recursive){
-        file_found = directory_find_recursive(dirp, filename);
-    } else {
-        file_found = directory_find(dirp, filename);
-    }
-    
-    if (file_found){
-        std::cout << "DEBUG file was found in given directory" << std::endl;
-    } else {
+    if (!file_found)
+    {
         std::cout << "DEBUG file does not exist in given directory" << std::endl;
     }
-      
-    // TODO: Child process for each filepath 
 
+    // TODO: Child process for each filepath
 
     return EXIT_SUCCESS;
 }
