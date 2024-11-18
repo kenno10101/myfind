@@ -158,3 +158,9 @@ int main(int argc, char *argv[])
 
     return EXIT_SUCCESS;
 }
+
+
+// Todo : case insensitive search
+// Todo : nicht 2x das gleiche opt
+// Todo : Bei mehreren Dateien sollen alle gefundenen Dateien ausgegeben werden
+// Todo : ??? mehrere Makefiles sollen auch gefunden werden???
