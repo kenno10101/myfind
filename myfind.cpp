@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <sys/wait.h> // for waitpid
+#include <bits/stdc++.h>
 
 namespace fs = std::filesystem;
 
@@ -19,18 +20,24 @@ void print_usage(const std::string &program_name)
 // In verzeichnis nach datei suchen
 bool directory_find(fs::path &path, std::string &filename, bool is_recursive, bool is_case_insensitive)
 {
-    if (is_case_insensitive) // case insensitive
+    if (is_case_insensitive) 
     {
-        filename = filename; // wir müssen das doch vergleichen mit tolower?
+        transform(filename.begin(), filename.end(), filename.begin(), ::tolower);
     }
 
     if (is_recursive) // rekursive suche
     {
         for (auto const &dir_entry : fs::recursive_directory_iterator{path})
         {
-            if (filename == dir_entry.path().filename())
+            std::string entry_filename = dir_entry.path().filename();
+
+            if(is_case_insensitive){
+                transform(entry_filename.begin(), entry_filename.end(), entry_filename.begin(), ::tolower);
+            }
+
+            if (filename == entry_filename)
             {
-                std::cout << getpid() << ": " << filename << ": " << dir_entry.path() << "\n";
+                std::cout << getpid() << ": " << dir_entry.path().filename() << ": " << dir_entry.path() << "\n";
                 return true;
             }
         }
@@ -39,7 +46,13 @@ bool directory_find(fs::path &path, std::string &filename, bool is_recursive, bo
     {
         for (auto const &dir_entry : fs::directory_iterator{path})
         {
-            if (filename == dir_entry.path().filename())
+            std::string entry_filename = dir_entry.path().filename();
+
+            if(is_case_insensitive){
+                transform(entry_filename.begin(), entry_filename.end(), entry_filename.begin(), ::tolower);
+            }
+
+            if (filename == entry_filename)
             {
                 std::cout << getpid() << ": " << filename << ": " << dir_entry.path() << "\n";
                 return true;
