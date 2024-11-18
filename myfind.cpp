@@ -25,7 +25,7 @@ bool directory_find(fs::path &path, std::string &filename, bool is_recursive, bo
 
     if (is_case_insensitive)
     {
-        transform(filename.begin(), filename.end(), filename.begin(), ::tolower);
+        std::transform(filename.begin(), filename.end(), filename.begin(), ::tolower);
     }
 
     if (is_recursive) // rekursive suche
