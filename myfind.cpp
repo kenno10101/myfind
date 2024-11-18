@@ -20,7 +20,10 @@ void print_usage(const std::string &program_name)
 // In verzeichnis nach datei suchen
 bool directory_find(fs::path &path, std::string &filename, bool is_recursive, bool is_case_insensitive)
 {
-    if (is_case_insensitive) 
+
+    fs::path cwd = fs::current_path().parent_path();
+
+    if (is_case_insensitive)
     {
         transform(filename.begin(), filename.end(), filename.begin(), ::tolower);
     }
@@ -31,13 +34,17 @@ bool directory_find(fs::path &path, std::string &filename, bool is_recursive, bo
         {
             std::string entry_filename = dir_entry.path().filename();
 
-            if(is_case_insensitive){
+            fs::path abs_path = fs::absolute(dir_entry.path());
+            fs::path abs_path_from_cwd = fs::relative(abs_path, cwd);
+
+            if (is_case_insensitive)
+            {
                 transform(entry_filename.begin(), entry_filename.end(), entry_filename.begin(), ::tolower);
             }
 
             if (filename == entry_filename)
             {
-                std::cout << getpid() << ": " << dir_entry.path().filename() << ": " << dir_entry.path() << "\n";
+                std::cout << getpid() << ": " << dir_entry.path().filename() << ": " << abs_path_from_cwd << "\n";
                 return true;
             }
         }
@@ -48,20 +55,23 @@ bool directory_find(fs::path &path, std::string &filename, bool is_recursive, bo
         {
             std::string entry_filename = dir_entry.path().filename();
 
-            if(is_case_insensitive){
+            fs::path abs_path = fs::absolute(dir_entry.path());
+            fs::path abs_path_from_cwd = fs::relative(abs_path, cwd);
+
+            if (is_case_insensitive)
+            {
                 transform(entry_filename.begin(), entry_filename.end(), entry_filename.begin(), ::tolower);
             }
 
             if (filename == entry_filename)
             {
-                std::cout << getpid() << ": " << filename << ": " << dir_entry.path() << "\n";
+                std::cout << getpid() << ": " << dir_entry.path().filename() << ": " << abs_path_from_cwd << "\n";
                 return true;
             }
         }
     }
 
     return false;
-    
 }
 
 void take_args(int argc, char *argv[], bool &is_recursive, bool &is_case_insensitive)
@@ -127,31 +137,37 @@ void handle_childprocesses(int &argc, char *argv[], bool &is_recursive, bool &is
 {
     std::vector<pid_t> children;
 
-    for (int i = optind; i < argc; i++) { // opind zeigt jetzt auf das erste Argument nach den Optionen
-        std::string filename = argv[i]; 
-        pid_t pid = fork(); 
-        if (pid == 0) {
+    for (int i = optind; i < argc; i++)
+    { // opind zeigt jetzt auf das erste Argument nach den Optionen
+        std::string filename = argv[i];
+        pid_t pid = fork();
+        if (pid == 0)
+        {
             // Child process
             child(searchpath, filename, is_recursive, is_case_insensitive);
-        } 
-        
-        else if (pid > 0) {
+        }
+
+        else if (pid > 0)
+        {
             // Parent process
             children.push_back(pid);
-        } 
-        
-        else {
+        }
+
+        else
+        {
             std::cerr << "Error: Could not create child process\n";
             exit(EXIT_FAILURE);
         }
     }
 
-    // wartet auf alle childprozesse 
-    for (pid_t pid : children) {
+    // wartet auf alle childprozesse
+    for (pid_t pid : children)
+    {
         int status;
         pid_t wpid = waitpid(pid, &status, 0);
 
-        if(wpid == -1) {
+        if (wpid == -1)
+        {
             std::cerr << "Error: waitpid failed\n";
             exit(EXIT_FAILURE);
         }
@@ -172,9 +188,6 @@ int main(int argc, char *argv[])
     return EXIT_SUCCESS;
 }
 
-
-// Todo : case insensitive search
 // Todo : nicht 2x das gleiche opt
 // Todo : Bei mehreren Dateien sollen alle gefundenen Dateien ausgegeben werden
 // Todo : ??? mehrere Makefiles sollen auch gefunden werden???
-// Todo : absoluten pfad ausgeben
