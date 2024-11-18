@@ -9,8 +9,7 @@
 
 namespace fs = std::filesystem;
 
-
-// Ausgabe der Meldung
+// Ausgabe einer Fehlermeldung bei ungültiger Eingabe
 void print_usage(const std::string &program_name)
 {
     std::cerr << "Usage: " << program_name << " [-R] [-i] searchpath filename1 [filename2] ... [filenameN]\n";
@@ -22,7 +21,7 @@ bool directory_find(fs::path &path, std::string &filename, bool is_recursive, bo
 {
     if (is_case_insensitive) // case insensitive
     {
-        filename = filename;
+        filename = filename; // wir müssen das doch vergleichen mit tolower?
     }
 
     if (is_recursive) // rekursive suche
@@ -57,7 +56,7 @@ void take_args(int argc, char *argv[], bool &is_recursive, bool &is_case_insensi
     int c;
     bool error = false;
 
-    while ((c = getopt(argc, argv, "Ri")) != -1)
+    while ((c = getopt(argc, argv, "Ri")) != EOF) // durchsucht die Argumente nach Ri
     {
         switch (c)
         {
@@ -66,6 +65,9 @@ void take_args(int argc, char *argv[], bool &is_recursive, bool &is_case_insensi
             break;
         case 'i':
             is_case_insensitive = true;
+            break;
+        case '?':
+            error = true;
             break;
         default:
             error = true;
@@ -100,7 +102,7 @@ void child(const fs::path &searchpath, const std::string &filename, bool is_recu
 
 fs::path validate_searchpath(const std::string &searchpath)
 {
-    if (!fs::exists(searchpath) || !fs::is_directory(searchpath))
+    if (!fs::exists(searchpath) || !fs::is_directory(searchpath)) // überprüft ob der Pfad existiert und ob es ein Verzeichnis ist
     {
         std::cerr << "Error: " << searchpath << " is not a valid directory.\n";
         exit(EXIT_FAILURE);
@@ -112,9 +114,9 @@ void handle_childprocesses(int &argc, char *argv[], bool &is_recursive, bool &is
 {
     std::vector<pid_t> children;
 
-    for (int i = optind; i < argc; i++) {
-        std::string filename = argv[i];
-        pid_t pid = fork();
+    for (int i = optind; i < argc; i++) { // opind zeigt jetzt auf das erste Argument nach den Optionen
+        std::string filename = argv[i]; 
+        pid_t pid = fork(); 
         if (pid == 0) {
             // Child process
             child(searchpath, filename, is_recursive, is_case_insensitive);
@@ -126,13 +128,12 @@ void handle_childprocesses(int &argc, char *argv[], bool &is_recursive, bool &is
         } 
         
         else {
-            // Error
             std::cerr << "Error: Could not create child process\n";
             exit(EXIT_FAILURE);
         }
     }
 
-    // Wait for all child processes to finish
+    // wartet auf alle childprozesse 
     for (pid_t pid : children) {
         int status;
         pid_t wpid = waitpid(pid, &status, 0);
@@ -143,7 +144,6 @@ void handle_childprocesses(int &argc, char *argv[], bool &is_recursive, bool &is
         }
     }
 }
-
 
 int main(int argc, char *argv[])
 {
