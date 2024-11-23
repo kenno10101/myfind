@@ -18,7 +18,7 @@ fs::path Myfind::getAbsolutePathFromDirEntry(fs::directory_entry const &dir_entr
 }
 
 // In verzeichnis nach datei suchen
-bool Myfind::directory_find(const fs::path &path, std::string &filename, bool is_recursive, bool is_case_insensitive)
+bool Myfind::directory_find(const fs::path &path, std::string &filename, bool is_recursive, bool is_case_insensitive, std::unordered_map<fs::path, int> &list_found_filepaths, std::string &output_filename, fs::path &output_filepath)
 {
     bool file_found = false;
 
@@ -40,8 +40,19 @@ bool Myfind::directory_find(const fs::path &path, std::string &filename, bool is
 
             if (filename == entry_filename)
             {
-                std::cout << getpid() << ": " << Myfind::getFilenameFromDirEntry(dir_entry) << ": " << Myfind::getAbsolutePathFromDirEntry(dir_entry) << "\n";
+                fs::path filepath = Myfind::getAbsolutePathFromDirEntry(dir_entry);
+
+                if (list_found_filepaths[filepath] >= 1)
+                {
+                    continue;
+                }
+                std::cout << "DEBUG " << list_found_filepaths[filepath] << std::endl;
+                list_found_filepaths[filepath]++;
+                std::cout << "DEBUG " << list_found_filepaths[filepath] << std::endl;
+
                 file_found = true;
+                output_filename = Myfind::getFilenameFromDirEntry(dir_entry);
+                output_filepath = filepath;
                 break;
             }
         }
@@ -59,8 +70,17 @@ bool Myfind::directory_find(const fs::path &path, std::string &filename, bool is
 
             if (filename == entry_filename)
             {
-                std::cout << getpid() << ": " << dir_entry.path().filename() << ": " << Myfind::getAbsolutePathFromDirEntry(dir_entry) << "\n";
+                fs::path filepath = Myfind::getAbsolutePathFromDirEntry(dir_entry);
+
+                if (list_found_filepaths[filepath] >= 1)
+                {
+                    continue;
+                }
+                list_found_filepaths[filepath]++;
+
                 file_found = true;
+                output_filename = Myfind::getFilenameFromDirEntry(dir_entry);
+                output_filepath = filepath;
                 break;
             }
         }
