@@ -1,6 +1,3 @@
-#
-# A simple makefile for compiling a c++ project
-#
 .DEFAULT_GOAL := myfind.cpp
 
 CC = g++
@@ -8,11 +5,14 @@ CFLAGS = -Wall -g
 
 all: clean myfind
 
-myfind: myfind.o
-	$(CC) $(CFLAGS) myfind.o -o myfind
+myfind: main.o myfind.o
+	$(CC) $(CFLAGS) main.o myfind.o -o myfind
 
-myfind.o:
-	$(CC) $(CFLAGS) -c myfind.cpp
+main.o: src/main.cpp
+	$(CC) $(CFLAGS) -c src/main.cpp
+
+myfind.o: src/myfind.cpp include/myfind.h
+	$(CC) $(CFLAGS) -c src/myfind.cpp
 
 clean: 
 	rm -rf *.o myfind
