@@ -4,10 +4,14 @@
 #include <unistd.h> // für getopt()
 #include <dirent.h> // für directory operations
 #include <vector>
-#include <string>
 #include <sys/wait.h> // for waitpid
+#include <semaphore.h>
+#include <cctype>
+#include <algorithm>
 
 namespace fs = std::filesystem;
+
+sem_t sem; // Semaphore für synchronisierten Output
 
 // Ausgabe einer Fehlermeldung bei ungültiger Eingabe
 void print_usage(const std::string &program_name)
@@ -16,65 +20,93 @@ void print_usage(const std::string &program_name)
     exit(EXIT_FAILURE);
 }
 
-// In verzeichnis nach datei suchen
+// Case-insensitive Vergleichsfunktion
+bool case_insensitive_compare(const std::string &s1, const std::string &s2)
+{
+    if (s1.size() != s2.size())
+        return false;
+
+    return std::equal(s1.begin(), s1.end(), s2.begin(), s2.end(),
+                      [](char c1, char c2)
+                      { return std::tolower(c1) == std::tolower(c2); });
+}
+
+// In Verzeichnis nach Datei suchen
 bool directory_find(fs::path &path, std::string &filename, bool is_recursive, bool is_case_insensitive)
 {
-    if (is_case_insensitive) // case insensitive
-    {
-        filename = filename; // wir müssen das doch vergleichen mit tolower?
-    }
+    bool found = false;
 
     if (is_recursive) // rekursive suche
     {
-        for (auto const &dir_entry : fs::recursive_directory_iterator{path})
+        for (const auto &dir_entry : fs::recursive_directory_iterator{path})
         {
-            if (filename == dir_entry.path().filename())
+            std::string entry_name = dir_entry.path().filename().string();
+
+            if ((is_case_insensitive && case_insensitive_compare(entry_name, filename)) ||
+                (!is_case_insensitive && entry_name == filename))
             {
-                std::cout << getpid() << ": " << filename << ": " << dir_entry.path() << "\n";
-                return true;
+                sem_wait(&sem); // Semaphore für synchronisierten Output
+                std::cout << getpid() << ": " << filename << ": " << fs::absolute(dir_entry.path()) << "\n";
+                sem_post(&sem);
+                found = true;
             }
         }
     }
     else // nicht rekursive suche
     {
-        for (auto const &dir_entry : fs::directory_iterator{path})
+        for (const auto &dir_entry : fs::directory_iterator{path})
         {
-            if (filename == dir_entry.path().filename())
+            std::string entry_name = dir_entry.path().filename().string();
+
+            if ((is_case_insensitive && case_insensitive_compare(entry_name, filename)) ||
+                (!is_case_insensitive && entry_name == filename))
             {
-                std::cout << getpid() << ": " << filename << ": " << dir_entry.path() << "\n";
-                return true;
+                sem_wait(&sem); // Semaphore für synchronisierten Output
+                std::cout << getpid() << ": " << filename << ": " << fs::absolute(dir_entry.path()) << "\n";
+                sem_post(&sem);
+                found = true;
             }
         }
     }
 
-    return false;
-    
+    return found;
 }
 
 void take_args(int argc, char *argv[], bool &is_recursive, bool &is_case_insensitive)
 {
     int c;
-    bool error = false;
+    bool r_set = false;
+    bool i_set = false;
 
     while ((c = getopt(argc, argv, "Ri")) != EOF) // durchsucht die Argumente nach Ri
     {
         switch (c)
         {
         case 'R':
+            if (r_set)
+            {
+                std::cerr << "Error: Option '-R' specified multiple times.\n";
+                print_usage(argv[0]);
+            }
             is_recursive = true;
+            r_set = true;
             break;
         case 'i':
+            if (i_set)
+            {
+                std::cerr << "Error: Option '-i' specified multiple times.\n";
+                print_usage(argv[0]);
+            }
             is_case_insensitive = true;
+            i_set = true;
             break;
         case '?':
-            error = true;
-            break;
         default:
-            error = true;
+            print_usage(argv[0]);
         }
     }
 
-    if (error || optind >= argc)
+    if (optind >= argc)
     {
         print_usage(argv[0]);
     }
@@ -89,13 +121,8 @@ void child(const fs::path &searchpath, const std::string &filename, bool is_recu
         exit(EXIT_FAILURE);
     }
 
-    bool file_found = directory_find(const_cast<fs::path &>(searchpath), const_cast<std::string &>(filename), is_recursive, is_case_insensitive);
+    directory_find(const_cast<fs::path &>(searchpath), const_cast<std::string &>(filename), is_recursive, is_case_insensitive);
     closedir(dirp);
-
-    if (!file_found)
-    {
-        std::cout << "File " << filename << " not found in " << searchpath << "\n";
-    }
 
     exit(EXIT_SUCCESS);
 }
@@ -147,6 +174,8 @@ void handle_childprocesses(int &argc, char *argv[], bool &is_recursive, bool &is
 
 int main(int argc, char *argv[])
 {
+    sem_init(&sem, 0, 1); // Initialisiere Semaphore
+
     bool is_recursive = false;
     bool is_case_insensitive = false;
 
@@ -156,12 +185,6 @@ int main(int argc, char *argv[])
 
     handle_childprocesses(argc, argv, is_recursive, is_case_insensitive, searchpath);
 
+    sem_destroy(&sem); // Zerstöre Semaphore
     return EXIT_SUCCESS;
 }
-
-
-// Todo : case insensitive search
-// Todo : nicht 2x das gleiche opt
-// Todo : Bei mehreren Dateien sollen alle gefundenen Dateien ausgegeben werden
-// Todo : ??? mehrere Makefiles sollen auch gefunden werden???
-// Todo : absoluten pfad ausgeben
