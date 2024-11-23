@@ -17,15 +17,20 @@ void print_usage(const std::string &program_name)
     exit(EXIT_FAILURE);
 }
 
+void convert_tolower(std::string &input)
+{
+    std::transform(input.begin(), input.end(), input.begin(), ::tolower);
+}
+
 // In verzeichnis nach datei suchen
 bool directory_find(fs::path &path, std::string &filename, bool is_recursive, bool is_case_insensitive)
 {
 
     fs::path cwd = fs::current_path().parent_path();
 
-    if (is_case_insensitive)
+    if (is_case_insensitive) // konvertiert in lowercase falls Option ausgewählt ist
     {
-        std::transform(filename.begin(), filename.end(), filename.begin(), ::tolower);
+        convert_tolower(filename);
     }
 
     if (is_recursive) // rekursive suche
@@ -39,7 +44,7 @@ bool directory_find(fs::path &path, std::string &filename, bool is_recursive, bo
 
             if (is_case_insensitive)
             {
-                std::transform(entry_filename.begin(), entry_filename.end(), entry_filename.begin(), ::tolower);
+                convert_tolower(entry_filename);
             }
 
             if (filename == entry_filename)
@@ -60,7 +65,7 @@ bool directory_find(fs::path &path, std::string &filename, bool is_recursive, bo
 
             if (is_case_insensitive)
             {
-                std::transform(entry_filename.begin(), entry_filename.end(), entry_filename.begin(), ::tolower);
+                convert_tolower(entry_filename);
             }
 
             if (filename == entry_filename)
@@ -188,6 +193,6 @@ int main(int argc, char *argv[])
     return EXIT_SUCCESS;
 }
 
+// Todo : kommentieren
 // Todo : nicht 2x das gleiche opt
 // Todo : Bei mehreren Dateien sollen alle gefundenen Dateien ausgegeben werden
-// Todo : ??? mehrere Makefiles sollen auch gefunden werden???
