@@ -5,86 +5,59 @@ void Myfind::convert_tolower(std::string &input)
     std::transform(input.begin(), input.end(), input.begin(), ::tolower);
 }
 
-std::string Myfind::getFilenameFromDirEntry(fs::directory_entry const &dir_entry)
+bool Myfind::directory_find(
+    const fs::path &path,
+    const std::string &filename,
+    bool is_recursive,
+    bool is_case_insensitive,
+    std::vector<std::pair<std::string, fs::path>> &found_files)
 {
-    return dir_entry.path().filename();
-}
+    DIR *dirp = opendir(path.c_str());
+    if (dirp == nullptr)
+    {
+        std::cerr << "Error: Could not open directory " << path << std::endl;
+        return false;
+    }
 
-fs::path Myfind::getAbsolutePathFromDirEntry(fs::directory_entry const &dir_entry)
-{
-    fs::path cwd = fs::current_path().parent_path();
-    fs::path abs_path = fs::absolute(dir_entry.path());
-    return fs::relative(abs_path, cwd);
-}
-
-// In verzeichnis nach datei suchen
-bool Myfind::directory_find(const fs::path &path, std::string &filename, bool is_recursive, bool is_case_insensitive, std::unordered_map<fs::path, int> &list_found_filepaths, std::string &output_filename, fs::path &output_filepath)
-{
+    struct dirent *entry;
     bool file_found = false;
 
-    if (is_case_insensitive) // konvertiert in lowercase falls Option ausgewählt ist
+    while ((entry = readdir(dirp)) != nullptr)
     {
-        Myfind::convert_tolower(filename);
-    }
+        std::string entry_name = entry->d_name;
 
-    if (is_recursive) // rekursive suche
-    {
-        for (fs::directory_entry const &dir_entry : fs::recursive_directory_iterator{path})
+        if (entry_name == "." || entry_name == "..")
         {
-            std::string entry_filename = Myfind::getFilenameFromDirEntry(dir_entry);
-
-            if (is_case_insensitive)
-            {
-                Myfind::convert_tolower(entry_filename);
-            }
-
-            if (filename == entry_filename)
-            {
-                fs::path filepath = Myfind::getAbsolutePathFromDirEntry(dir_entry);
-
-                if (list_found_filepaths[filepath] >= 1)
-                {
-                    continue;
-                }
-                std::cout << "DEBUG " << list_found_filepaths[filepath] << std::endl;
-                list_found_filepaths[filepath]++;
-                std::cout << "DEBUG " << list_found_filepaths[filepath] << std::endl;
-
-                file_found = true;
-                output_filename = Myfind::getFilenameFromDirEntry(dir_entry);
-                output_filepath = filepath;
-                break;
-            }
+            continue;
         }
-    }
-    else // nicht rekursive suche
-    {
-        for (fs::directory_entry const &dir_entry : fs::directory_iterator{path})
-        {
-            std::string entry_filename = dir_entry.path().filename();
 
+        std::string entry_name_lower = entry_name;
+        if (is_case_insensitive)
+        {
+            Myfind::convert_tolower(entry_name_lower);
+        }
+
+        fs::path entry_path = path / entry_name;
+        if (entry->d_type == DT_DIR && is_recursive)
+        {
+            directory_find(entry_path, filename, is_recursive, is_case_insensitive, found_files);
+        }
+        else if (entry->d_type == DT_REG)
+        {
+            std::string filename_lower = filename;
             if (is_case_insensitive)
             {
-                Myfind::convert_tolower(entry_filename);
+                Myfind::convert_tolower(filename_lower);
             }
 
-            if (filename == entry_filename)
+            if (entry_name_lower == filename_lower)
             {
-                fs::path filepath = Myfind::getAbsolutePathFromDirEntry(dir_entry);
-
-                if (list_found_filepaths[filepath] >= 1)
-                {
-                    continue;
-                }
-                list_found_filepaths[filepath]++;
-
+                found_files.emplace_back(entry_name, fs::absolute(entry_path));
                 file_found = true;
-                output_filename = Myfind::getFilenameFromDirEntry(dir_entry);
-                output_filepath = filepath;
-                break;
             }
         }
     }
 
+    closedir(dirp);
     return file_found;
 }

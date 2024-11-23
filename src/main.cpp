@@ -2,7 +2,7 @@
 
 void print_usage(const std::string &program_name);
 void take_args(int argc, char *argv[], bool &is_recursive, bool &is_case_insensitive);
-void child(const fs::path &searchpath, const std::string &filename, bool is_recursive, bool is_case_insensitive, std::unordered_map<fs::path, int> &list_found_filepaths, sem_t *sem);
+void child(const fs::path &searchpath, const std::string &filename, bool is_recursive, bool is_case_insensitive, sem_t *sem);
 void handle_childprocesses(int &argc, char *argv[], bool &is_recursive, bool &is_case_insensitive, fs::path &searchpath, sem_t *sem);
 fs::path validate_searchpath(const std::string &searchpath);
 
@@ -92,19 +92,12 @@ fs::path validate_searchpath(const std::string &searchpath)
     return searchpath;
 }
 
-void child(const fs::path &searchpath, const std::string &filename, bool is_recursive, bool is_case_insensitive, std::unordered_map<fs::path, int> &list_found_filepaths, sem_t *sem)
+void child(const fs::path &searchpath, const std::string &filename, bool is_recursive, bool is_case_insensitive, sem_t *sem)
 {
-    DIR *dirp = opendir(searchpath.c_str());
-    if (dirp == nullptr)
-    {
-        std::cerr << "Error: Could not open directory " << searchpath << "\n";
-        exit(EXIT_FAILURE);
-    }
+    std::vector<std::pair<std::string, fs::path>> found_files;
 
-    std::string output_filename = "";
-    fs::path output_filepath = "";
+    Myfind::directory_find(searchpath, filename, is_recursive, is_case_insensitive, found_files);
 
-    bool file_found = Myfind::directory_find(const_cast<fs::path &>(searchpath), const_cast<std::string &>(filename), is_recursive, is_case_insensitive, list_found_filepaths, output_filename, output_filepath);
 
     // Lock semaphore before accessing shared list
     // sync the output using the semaphore
@@ -113,11 +106,13 @@ void child(const fs::path &searchpath, const std::string &filename, bool is_recu
         std::cerr << "Semaphore wait failed in child process." << std::endl;
         exit(EXIT_FAILURE);
     }
-    if (file_found)
+
+    for (const auto &file : found_files)
     {
-        std::cout << getpid() << ": " << output_filename << ": " << output_filepath << "\n";
+        std::cout << getpid() << ": " << file.first << ": " << file.second << "\n";
     }
-    else
+
+    if (found_files.empty())
     {
         std::cout << "File " << filename << " not found in " << searchpath << "\n";
     }
@@ -128,7 +123,6 @@ void child(const fs::path &searchpath, const std::string &filename, bool is_recu
         exit(EXIT_FAILURE);
     }
 
-    closedir(dirp);
     exit(EXIT_SUCCESS);
 }
 
@@ -136,17 +130,14 @@ void handle_childprocesses(int &argc, char *argv[], bool &is_recursive, bool &is
 {
     std::vector<pid_t> children;
 
-    // use unordered_map to count occurence of a filepath -> skip already found files
-    std::unordered_map<fs::path, int> list_found_filepaths;
-
     for (int i = optind; i < argc; i++)
-    { // opind zeigt jetzt auf das erste Argument nach den Optionen
+    {
         std::string filename = argv[i];
         pid_t pid = fork();
         if (pid == 0)
         {
             // Child process
-            child(searchpath, filename, is_recursive, is_case_insensitive, list_found_filepaths, sem);
+            child(searchpath, filename, is_recursive, is_case_insensitive, sem);
         }
 
         else if (pid > 0)
@@ -175,6 +166,3 @@ void handle_childprocesses(int &argc, char *argv[], bool &is_recursive, bool &is
         }
     }
 }
-
-// Todo : kommentieren
-// Todo : Bei mehreren Dateien sollen alle gefundenen Dateien ausgegeben werden
