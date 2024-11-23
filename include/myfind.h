@@ -7,6 +7,7 @@
 #include <sys/wait.h>    // for waitpid
 #include <bits/stdc++.h> // for transform function/lowercase function
 #include <semaphore.h>   // for synchronisation of processes
+#include <fcntl.h>       //needed for processes
 
 namespace fs = std::filesystem;
 

@@ -38,9 +38,17 @@ void take_args(int argc, char *argv[], bool &is_recursive, bool &is_case_insensi
         switch (c)
         {
         case 'R':
+            if (is_recursive) // Check if -R has already been set
+            {
+                error = true;
+            }
             is_recursive = true;
             break;
         case 'i':
+            if (is_case_insensitive) // Check if -i has already been set
+            {
+                error = true;
+            }
             is_case_insensitive = true;
             break;
         case '?':
@@ -129,5 +137,5 @@ void handle_childprocesses(int &argc, char *argv[], bool &is_recursive, bool &is
 }
 
 // Todo : kommentieren
-// Todo : nicht 2x das gleiche opt
+// Todo : semaphore synchronization?
 // Todo : Bei mehreren Dateien sollen alle gefundenen Dateien ausgegeben werden
