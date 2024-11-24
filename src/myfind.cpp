@@ -1,24 +1,26 @@
 #include "../include/myfind.h"
 
+// converts string to lowercase
 void Myfind::convert_tolower(std::string &input)
 {
     std::transform(input.begin(), input.end(), input.begin(), ::tolower);
 }
 
+// returns filename from a directory_entry
 std::string Myfind::getFilenameFromDirEntry(fs::directory_entry const &dir_entry)
 {
     return dir_entry.path().filename();
 }
 
+// returns absolute path from a directory_entry
 fs::path Myfind::getAbsolutePathFromDirEntry(fs::directory_entry const &dir_entry)
 {
-    fs::path cwd = fs::current_path().parent_path();
-    fs::path abs_path = fs::absolute(dir_entry.path());
-    return fs::relative(abs_path, cwd);
+    fs::path cwd = fs::current_path();
+    return fs::absolute(fs::relative(dir_entry.path(), cwd));
 }
 
-// In verzeichnis nach datei suchen
-bool Myfind::directory_find(const fs::path &path, std::string &filename, bool is_recursive, bool is_case_insensitive, std::unordered_map<fs::path, int> &list_found_filepaths, std::string &output_filename, fs::path &output_filepath)
+// searches for a file in a directory
+bool Myfind::directory_find(const fs::path &path, std::string &filename, bool is_recursive, bool is_case_insensitive)
 {
     bool file_found = false;
 
@@ -27,11 +29,12 @@ bool Myfind::directory_find(const fs::path &path, std::string &filename, bool is
         Myfind::convert_tolower(filename);
     }
 
-    if (is_recursive) // rekursive suche
+    if (is_recursive) // recursive search in subdirectories
     {
         for (fs::directory_entry const &dir_entry : fs::recursive_directory_iterator{path})
         {
             std::string entry_filename = Myfind::getFilenameFromDirEntry(dir_entry);
+            std::string output_filename = entry_filename;
 
             if (is_case_insensitive)
             {
@@ -40,28 +43,20 @@ bool Myfind::directory_find(const fs::path &path, std::string &filename, bool is
 
             if (filename == entry_filename)
             {
-                fs::path filepath = Myfind::getAbsolutePathFromDirEntry(dir_entry);
+                fs::path output_filepath = Myfind::getAbsolutePathFromDirEntry(dir_entry);
 
-                if (list_found_filepaths[filepath] >= 1)
-                {
-                    continue;
-                }
-                std::cout << "DEBUG " << list_found_filepaths[filepath] << std::endl;
-                list_found_filepaths[filepath]++;
-                std::cout << "DEBUG " << list_found_filepaths[filepath] << std::endl;
+                std::cout << getpid() << ": " << output_filename << ": " << output_filepath << std::endl;
 
                 file_found = true;
-                output_filename = Myfind::getFilenameFromDirEntry(dir_entry);
-                output_filepath = filepath;
-                break;
             }
         }
     }
-    else // nicht rekursive suche
+    else // not recursive search
     {
         for (fs::directory_entry const &dir_entry : fs::directory_iterator{path})
         {
             std::string entry_filename = dir_entry.path().filename();
+            std::string output_filename = entry_filename;
 
             if (is_case_insensitive)
             {
@@ -70,17 +65,11 @@ bool Myfind::directory_find(const fs::path &path, std::string &filename, bool is
 
             if (filename == entry_filename)
             {
-                fs::path filepath = Myfind::getAbsolutePathFromDirEntry(dir_entry);
+                fs::path output_filepath = Myfind::getAbsolutePathFromDirEntry(dir_entry);
 
-                if (list_found_filepaths[filepath] >= 1)
-                {
-                    continue;
-                }
-                list_found_filepaths[filepath]++;
+                std::cout << getpid() << ": " << output_filename << ": " << output_filepath << std::endl;
 
                 file_found = true;
-                output_filename = Myfind::getFilenameFromDirEntry(dir_entry);
-                output_filepath = filepath;
                 break;
             }
         }

@@ -1,13 +1,14 @@
 #include "../include/myfind.h"
 
-void print_usage(const std::string &program_name);
-void take_args(int argc, char *argv[], bool &is_recursive, bool &is_case_insensitive);
-void child(const fs::path &searchpath, const std::string &filename, bool is_recursive, bool is_case_insensitive, std::unordered_map<fs::path, int> &list_found_filepaths, sem_t *sem);
-void handle_childprocesses(int &argc, char *argv[], bool &is_recursive, bool &is_case_insensitive, fs::path &searchpath, sem_t *sem);
-fs::path validate_searchpath(const std::string &searchpath);
+void print_usage(const std::string &program_name); // function to print usage and exit
+void take_args(int argc, char *argv[], bool &is_recursive, bool &is_case_insensitive); // function to handle arguments
+void child(const fs::path &searchpath, const std::string &filename, bool is_recursive, bool is_case_insensitive, sem_t *sem); // function to handle child process
+void handle_childprocesses(int &argc, char *argv[], bool &is_recursive, bool &is_case_insensitive, fs::path &searchpath, sem_t *sem); // function to handle child processes
+fs::path validate_searchpath(const std::string &searchpath); // function to validate the searchpath
 
 int main(int argc, char *argv[])
 {
+    // flags for the -R (recursive) and -i (case insensitive) options
     bool is_recursive = false;
     bool is_case_insensitive = false;
 
@@ -15,7 +16,7 @@ int main(int argc, char *argv[])
 
     fs::path searchpath = validate_searchpath(argv[optind++]);
 
-    // Create or open a semaphore for synchronization
+    // create or open a semaphore for synchronization
     sem_t *sem;
     sem_unlink("sync_semaphore"); // remove any existing semaphore before a new one
     sem = sem_open("sync_semaphore", O_CREAT | O_EXCL, 0644, 1);
@@ -37,7 +38,7 @@ int main(int argc, char *argv[])
     return EXIT_SUCCESS;
 }
 
-// Ausgabe einer Fehlermeldung bei ungültiger Eingabe
+// print usage instructions if input is incorrect
 void print_usage(const std::string &program_name)
 {
     std::cerr << "Usage: " << program_name << " [-R] [-i] searchpath filename1 [filename2] ... [filenameN]\n";
@@ -50,19 +51,19 @@ void take_args(int argc, char *argv[], bool &is_recursive, bool &is_case_insensi
     int c;
     bool error = false;
 
-    while ((c = getopt(argc, argv, "Ri")) != EOF) // durchsucht die Argumente nach Ri
+    while ((c = getopt(argc, argv, "Ri")) != EOF) // searches for options
     {
         switch (c)
         {
         case 'R':
-            if (is_recursive) // Check if -R has already been set
+            if (is_recursive) // check if -R has already been set
             {
                 error = true;
             }
             is_recursive = true;
             break;
         case 'i':
-            if (is_case_insensitive) // Check if -i has already been set
+            if (is_case_insensitive) // check if -i has already been set
             {
                 error = true;
             }
@@ -76,15 +77,17 @@ void take_args(int argc, char *argv[], bool &is_recursive, bool &is_case_insensi
         }
     }
 
-    if (error || optind >= argc)
+    // print error message if there is an error or arguments missing
+    if (error || optind >= argc || argc == optind + 1)
     {
         print_usage(argv[0]);
     }
 }
 
+// check if path exists or of it is a directory
 fs::path validate_searchpath(const std::string &searchpath)
 {
-    if (!fs::exists(searchpath) || !fs::is_directory(searchpath)) // überprüft ob der Pfad existiert und ob es ein Verzeichnis ist
+    if (!fs::exists(searchpath) || !fs::is_directory(searchpath)) 
     {
         std::cerr << "Error: " << searchpath << " is not a valid directory.\n";
         exit(EXIT_FAILURE);
@@ -92,7 +95,8 @@ fs::path validate_searchpath(const std::string &searchpath)
     return searchpath;
 }
 
-void child(const fs::path &searchpath, const std::string &filename, bool is_recursive, bool is_case_insensitive, std::unordered_map<fs::path, int> &list_found_filepaths, sem_t *sem)
+// child process function to search for the file in the given directory
+void child(const fs::path &searchpath, const std::string &filename, bool is_recursive, bool is_case_insensitive, sem_t *sem)
 {
     DIR *dirp = opendir(searchpath.c_str());
     if (dirp == nullptr)
@@ -101,11 +105,6 @@ void child(const fs::path &searchpath, const std::string &filename, bool is_recu
         exit(EXIT_FAILURE);
     }
 
-    std::string output_filename = "";
-    fs::path output_filepath = "";
-
-    bool file_found = Myfind::directory_find(const_cast<fs::path &>(searchpath), const_cast<std::string &>(filename), is_recursive, is_case_insensitive, list_found_filepaths, output_filename, output_filepath);
-
     // Lock semaphore before accessing shared list
     // sync the output using the semaphore
     if (sem_wait(sem) == -1)
@@ -113,11 +112,10 @@ void child(const fs::path &searchpath, const std::string &filename, bool is_recu
         std::cerr << "Semaphore wait failed in child process." << std::endl;
         exit(EXIT_FAILURE);
     }
-    if (file_found)
-    {
-        std::cout << getpid() << ": " << output_filename << ": " << output_filepath << "\n";
-    }
-    else
+
+    bool file_found = Myfind::directory_find(const_cast<fs::path &>(searchpath), const_cast<std::string &>(filename), is_recursive, is_case_insensitive);
+
+    if (!file_found)
     {
         std::cout << "File " << filename << " not found in " << searchpath << "\n";
     }
@@ -132,21 +130,19 @@ void child(const fs::path &searchpath, const std::string &filename, bool is_recu
     exit(EXIT_SUCCESS);
 }
 
+// handle child processes for each file search
 void handle_childprocesses(int &argc, char *argv[], bool &is_recursive, bool &is_case_insensitive, fs::path &searchpath, sem_t *sem)
 {
     std::vector<pid_t> children;
 
-    // use unordered_map to count occurence of a filepath -> skip already found files
-    std::unordered_map<fs::path, int> list_found_filepaths;
-
     for (int i = optind; i < argc; i++)
-    { // opind zeigt jetzt auf das erste Argument nach den Optionen
+    { // opind points to the first argument
         std::string filename = argv[i];
         pid_t pid = fork();
         if (pid == 0)
         {
             // Child process
-            child(searchpath, filename, is_recursive, is_case_insensitive, list_found_filepaths, sem);
+            child(searchpath, filename, is_recursive, is_case_insensitive, sem);
         }
 
         else if (pid > 0)
@@ -155,7 +151,7 @@ void handle_childprocesses(int &argc, char *argv[], bool &is_recursive, bool &is
             children.push_back(pid);
         }
 
-        else
+        else // fork failed
         {
             std::cerr << "Error: Could not create child process\n";
             exit(EXIT_FAILURE);
@@ -175,6 +171,3 @@ void handle_childprocesses(int &argc, char *argv[], bool &is_recursive, bool &is
         }
     }
 }
-
-// Todo : kommentieren
-// Todo : Bei mehreren Dateien sollen alle gefundenen Dateien ausgegeben werden
