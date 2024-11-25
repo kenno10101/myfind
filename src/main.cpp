@@ -6,6 +6,15 @@ void child(const fs::path &searchpath, const std::string &filename, bool is_recu
 void handle_childprocesses(int &argc, char *argv[], bool &is_recursive, bool &is_case_insensitive, fs::path &searchpath, sem_t *sem); // function to handle child processes
 fs::path validate_searchpath(const std::string &searchpath); // function to validate the searchpath
 
+/*
+File search is handled by:
+1. Parsing arguments to get filenames, search path, and optional flags (-R for recursive, -i for case-insensitive search)
+2. Validating the search path (does it exist?, is it accessible?,  is it a directory?)
+3. Forking a child process for each filename to search within the provided path and optionally in subdirectories
+4. Creating a semaphore for synchronization and a clean output of the search results (unsorted)
+5. Printing results to stdout in the given format
+*/
+
 int main(int argc, char *argv[])
 {
     // flags for the -R (recursive) and -i (case insensitive) options
